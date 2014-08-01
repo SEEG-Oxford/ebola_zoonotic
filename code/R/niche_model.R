@@ -89,8 +89,7 @@ writeRaster(preds_sry,
 # save the relative influence scores
 relinf <- getRelInf(model_list)
 write.csv(relinf,
-          file = 'output/relative_influence.csv',
-          row.names = FALSE)
+          file = 'output/relative_influence.csv')
 
 # plot and the marginal effect curves
 png('output/effects.png',
