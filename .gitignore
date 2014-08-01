@@ -1,0 +1,16 @@
+.Rproj.user
+.Rhistory
+.RData
+
+# ignore project file
+*.Rproj
+
+# ignore anything in the data or other directories
+data/
+other/
+output/
+
+# ignore any pdfs or pngs
+*.pdf
+*.png
+*.html
