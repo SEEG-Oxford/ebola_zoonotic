@@ -60,6 +60,5 @@ dat <- dat[, c('ID',
 
 names(dat) <- tolower(names(dat))
 
-write.csv(dat, file = 'data/occurrence/clean/occurrence.csv')
-dat
-
+write.csv(dat, file = 'data/occurrence/clean/occurrence.csv',
+          row.names = FALSE)
