@@ -41,7 +41,7 @@ lastDay <- function (year, month) {
 #~~~~~~~~~
 
 # load data
-dat <- read.csv('data/occurrence/raw/Ebola_distribution_AM.csv')
+dat <- read.csv('data/occurrence/raw/Ebola_distribution_AM_V0_3.csv')
 
 # convert start and end dates into individual columns
 dat$start_date <- firstDay(dat$Year.Start,
@@ -51,14 +51,16 @@ dat$end_date <- lastDay(dat$Year.End,
                            dat$Month.End)
 
 # keep only the ID, virus, lat, long and start/end dates
-dat <- dat[, c('ID',
+dat <- dat[, c('UNIQUE_ID',
                'Virus',
                'Lat',
                'Long',
                'start_date',
                'end_date')]
 
+# set column labels to all lowercase
 names(dat) <- tolower(names(dat))
 
+# output the resulting table
 write.csv(dat, file = 'data/occurrence/clean/occurrence.csv',
           row.names = FALSE)
