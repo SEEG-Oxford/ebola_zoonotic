@@ -11,3 +11,5 @@ cp /home/lina1864/Dropbox/HAT/data/covariates/poverty_correlates/PET_1950.2000_5
 
 cp /home/lina1864/Dropbox/HAT/data/covariates/poverty_correlates/srtm_5km_global* /home/lina1864/Dropbox/SEEG_mapping/ebola/data/covs/
 
+cp /home/lina1864/Dropbox/HAT/data/covariates/friction/af1km* /home/lina1864/Dropbox/SEEG_mapping/ebola/data/friction/
+
