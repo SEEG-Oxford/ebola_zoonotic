@@ -16,10 +16,17 @@ library(snowfall)
 # load the data
 
 # raster covariates
+
+
 covs <- importRasters('data/covs/',
                       as = stack)
 
-pop <- covs[[which(names(covs) == "afripop_._asiapop_5km")]]
+
+# which layer gives population?
+pop_idx <- which(names(covs) == "afripop_._asiapop_5km")
+pop <- covs[[pop_idx]]
+
+covs <- covs[[-pop_idx]]
 
 # occurrence data
 occ <- read.csv('data/occurrence/clean/occurrence.csv')
@@ -27,13 +34,10 @@ occ <- read.csv('data/occurrence/clean/occurrence.csv')
 # remove Marburg data
 occ <- occ[occ$virus != 'Marburg', ]
 
-# generate pseudo-absence data according to the population surface
-# (assume perfect detection of human cases, so reported risk only
-# a function of population density)
-
+# generate pseudo-absence data uniformly at random from across the entire grid
 bg <- bgSample(pop,
-               n = 1000,
-               prob = TRUE,
+               n = 5000,
+               prob = FALSE,
                replace = TRUE,
                spatial = FALSE)
 
@@ -44,12 +48,33 @@ dat <- rbind(cbind(PA = rep(1, nrow(occ)),
              cbind(PA = rep(0, nrow(bg)),
                    bg))
 
+# extract covariates for all points
 dat_covs <- extract(covs, dat[, -1])
 
+# combine covariates with the other info
 dat_all <- cbind(dat, dat_covs)
 
-ncpu <- 60
-nboot <- ncpu * 1
+# extract the human population for each of these points
+dat_pop <- extract(pop, dat[, -1])
+
+# TWO OUTBREAKS ARE IN UNPOPULATED AREAS!!
+sum(dat[dat_pop == 0, 1])
+
+# remove all records in uninhabited areas
+empty <- dat_pop == 0
+dat_pop <- dat_pop[!empty]
+dat_all <- dat_all[!empty, ]
+
+# # set unpopulated areas to 0.001 to avoid divide by 0 errors
+# dat_pop[dat_pop == 0] <- 0.001
+
+# add this as an offset column to the dataframe, giving the number
+# of person years in that spot.
+dat_all <- cbind(dat_all,
+                 off = log(38 * dat_pop))
+
+ncpu <- 50
+nboot <- ncpu * 2
 
 # get random bootstraps of the data (minimum 5 pres/5 abs)
 data_list <- replicate(nboot,
@@ -61,14 +86,29 @@ data_list <- replicate(nboot,
 # initialize the cluster
 sfInit(parallel = TRUE, cpus = ncpu)
 sfLibrary(seegSDM)
-
+         
 model_list <- sfLapply(data_list,
                        runBRT,
-                       gbm.x = 4:ncol(dat_all),
+                       gbm.x = 4:(ncol(dat_all) - 1),
                        gbm.y = 1,
                        pred.raster = covs,
                        gbm.coords = 2:3,
-                       wt = function(PA) ifelse(PA == 1, 1, sum(PA) / sum(1 - PA)))
+                       method = 'perf',
+                       n.trees = 5000,
+                       family = 'poisson',
+                       gbm.offset = ncol(dat_all))
+
+# pred_person <- model_list[[1]]$pred
+# pred_pixel <- pred_person * pop
+# 
+# plot(pred_person)
+# 
+# plot(log(pred_pixel))
+# 
+# # number of outbreaks expected since 1976
+# sum(pred_pixel[],
+#     na.rm = TRUE) * 38
+
 
 # stop the cluster
 sfStop()
@@ -115,11 +155,6 @@ par(oma = rep(0, 4),
 plot(preds_sry[[1]],
      axes = FALSE,
      box = FALSE)
-
-points(dat[, -1],
-       pch = 16,
-       cex = 0.5,
-       col = rgb(0.4, 0.4, 0.4, 0.3))
 
 points(dat[dat$PA == 1, -1],
        pch = 16,
