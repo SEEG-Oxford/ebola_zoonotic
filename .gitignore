@@ -9,6 +9,7 @@
 data/
 other/
 output/
+shared/
 
 # ignore any pdfs or pngs
 *.pdf

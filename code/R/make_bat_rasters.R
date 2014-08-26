@@ -4,54 +4,56 @@
 rm(list = ls())
 
 # load packages
-library(devtools)
-install_github('taxize_',
-               'ropensci')
 library(seegSDM)
 library(taxize) # getting genera
 library(snowfall) # parallel
+library(rgeos)
 
-# ~~~~~~~~~~
-# define functions 
-
-rasterizeSpecies <- function(species, shape, raster, folder = 'mega_bats') {
-  tmp <- rasterize(shape[shape$BINOMIAL == species, ],
-                   raster,
-                   field = 1,
-                   background = 0,
-                   fun = 'first')
-
-  writeRaster(tmp,
-              filename = paste0('~/tmp/',
-                                folder,
-                                '/',
-                                gsub(' ', '_', species)),
-              format = 'GTiff',
-              overwrite = TRUE)
-  
-  rm(tmp)
-  
-  return (NULL)
-}
+# load functions
+source('code/R/functions.R')
 
 # ~~~~~~~~~~
 # load data
 
 # 1km template raster layer
-template <- raster('~/Z/zhi/friction_1km.tif')
+template <- raster('~/tmp/5km/covs.grd')
 
 # IUCN mammal range shapefiles
 mammterr <- shapefile('~/Z/users/nick/MERS-CoV/bats/MAMMTERR/MAMMTERR.shp')
 
+# check whether the list of genera exists & if not re-query it
+if (!file.exists('data/bats/megabat_genera.csv')) {
+  
+  # use taxize to get the names of the mega bat genera
+  mega <- itis_downstream(552301,
+                          'Genus') # megachiroptera
+  
+  # get genus names
+  mega_genera <- as.character(mega$taxonname)
+  
+  # write these to disk
+  write.csv(mega_genera,
+            file = 'data/bats/megabat_genera.csv',
+            row.names= FALSE)
+  
+} else {
+  
+  # otherwise reload it
+  mega_genera <- read.csv('data/bats/megabat_genera.csv')
+  
+  # convert to a vector
+  mega_genera <- mega_genera[, 1]
+  
+}
 
-# use taxize to get the names of micro and mega bat genera
-mega <- itis_downstream(552301,
-                        'Genus') # megachiroptera
-micro <- itis_downstream(552302,
-                         'Genus') # microchiroptera
+# also create and write the main bat species of interest:
+key_species <- c('Hypsignathus monstrosus',
+                 'Epomops franqueti',
+                 'Myonycteris torquata')
 
-mega_genera <- as.character(mega$taxonname)
-micro_genera <- as.character(micro$taxonname)
+write.csv(key_species,
+          file = 'data/bats/key_species.csv',
+          row.names = FALSE)
 
 # get ALL genera for terrestrial mammals in shapefile
 all_genera <- sapply(mammterr$BINOMIAL,
@@ -59,67 +61,86 @@ all_genera <- sapply(mammterr$BINOMIAL,
 
 # find genera which are mega/micro bats and keep only these
 mega_idx <- which(all_genera %in% mega_genera)
-micro_idx <- which(all_genera %in% micro_genera)
 
 # get shapefiles for each group
 mega_shp <- mammterr[mega_idx, ]
-micro_shp<- mammterr[micro_idx, ]
 
 # remove mammterr to free up memory
 rm(mammterr)
 
 # get the names of species for which there are shapefiles
 mega_species <- unique(mega_shp$BINOMIAL)
-micro_species <- unique(micro_shp$BINOMIAL)
 
 sfInit(cpus = 60, parallel = TRUE)
+# sfInit(cpus = 1, parallel = FALSE)
 sfLibrary(raster)
+sfLibrary(rgeos)
 
+# loop through, rasterizing these maps with an approximate 100km buffer zone
 mega_distrib <- sfLapply(mega_species,
                          rasterizeSpecies,
                          mega_shp,
-                         template)
-
-micro_distrib <- sfLapply(micro_species,
-                          rasterizeSpecies,
-                          micro_shp,
-                          template,
-                          folder = 'micro_bats')
+                         buffer = 100,
+                         raster = template,
+                         folder = 'bats/range_buff/')
 
 # loop through these, check if they contain any of the species' range,
 # if they do mask and save them, else delete them
+mega_files <- list.files('~/Z/zhi/ebola/bats/range_buff',
+                         full.names = TRUE)
 
-tidySpecies <- function (filename, template) {
-  # load a raster if it containsany of the species' range,
-  # mask and resave it, else delete it
-  tmp <- raster(filename)
-  if (maxValue(tmp) == 1) {
-    tmp <- mask(tmp,
-                template)
-    
-    writeRaster(tmp,
-                file = filename,
-                overwrite = TRUE)
+sfLapply(mega_files,
+         tidySpecies,
+         template)
 
-    } else {
-      
-    rm(tmp)
-    file.remove(filename)
-    
-  }
+sfStop()
+
+# stack the megabat rasters together
+mega_stack <- importRasters(path = '~/Z/zhi/ebola/bats/range_buff/',
+                            as = stack,
+                            ext = 'tif')
+
+# and save them as a multiband tiff
+writeRaster(mega_stack,
+            '~/Z/zhi/ebola/bats/mega_bats_buff',
+            format = 'GTiff',
+            overwrite = TRUE)
+
+# save the layer names with them
+write.csv(names(mega_stack),
+          file = '~/Z/zhi/ebola/bats/mega_bats_buff_tif_layernames.csv',
+          row.names = FALSE)
+
+# loop through these key species
+for (species in key_species) {
   
-  return (NULL)
+  # find the corresponding layer in mega_stack
+  species_idx <- match(gsub(' ',
+                            '_',
+                            species),
+                       names(mega_stack))
+  
+  # extract that layer
+  tmp <- mega_stack[[species_idx]]
+  
+  # save this as a separate raster
+  writeRaster(tmp,
+              filename = paste0('~/Z/zhi/ebola/bats/',
+                                gsub(' ',
+                                     '_',
+                                     species)),
+              format = 'GTiff',
+              overwrite = TRUE)
   
 }
 
-mega_files <- list.files('~/tmp/mega_bats/',
-                         full.names = TRUE)
+# calculate megabat species richness
+megabat_richness <- calc(mega_stack,
+                         fun = sum)
 
-micro_files <- list.files('~/tmp/micro_bats/',
-                          full.names = TRUE)
+writeRaster(megabat_richness,
+            file = '~/Z/zhi/ebola/bats/megabat_richness',
+            format = 'GTiff',
+            overwrite = TRUE)
 
-sfLapply(mega_files, tidySpecies, template)
-
-sfLapply(micro_files, tidySpecies, template)
-
-sfStop()
+#

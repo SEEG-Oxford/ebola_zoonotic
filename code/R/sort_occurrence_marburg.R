@@ -185,12 +185,14 @@ for(i in 1:nrow(shp)) {
   dat_new <- rbind(dat_new, info_mat)
 }
 
-# plot(template, maxpixels = 100000)
-# points(lat ~ long,
-#        data = dat_new,
-#        pch = 16,
-#        cex = 0.8,
-#        col = rgb(0.4, 0.4, 0.4))
+
+plot(template, maxpixels = 100000)
+points(lat ~ long,
+       data = dat_new,
+       pch = 16,
+       cex = 0.8,
+       col = rgb(0.4, 0.4, 0.4))
+
 
 # if the resulting dataset looks fairly clean, write it to disk
 if (!(any(is.na(dat_new)))) {
