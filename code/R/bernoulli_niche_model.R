@@ -315,10 +315,3 @@ for (i in 1:length(effect)) {
 }
 
 dev.off()
-
-# output the full 500-layer tiff to a temp folder to run the
-# PAR uncertainty estimates
-writeRaster(preds,
-            file = '~/tmp/ebola_bern_all',
-            format = 'GTiff',
-            overwrite = TRUE)
