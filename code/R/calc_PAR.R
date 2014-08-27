@@ -8,7 +8,7 @@ rm(list = ls())
 library(raster)
 library(snowfall)
 
-# load functions from funcntion files
+# load functions from function files
 source('code/R/functions.R')
 
 # load data
@@ -160,30 +160,10 @@ in_core <- match(core_set, dat$country)
 dat$has_cases[in_core] <- TRUE
 
 # sort by PAR, then whether cases are present
-dat <- dat[order(dat$population_at_risk, decreasing = TRUE), ]
+dat <- dat[order(dat$all, decreasing = TRUE), ]
 dat <- dat[order(dat$has_cases, decreasing = TRUE), ]
 
 # then save
 write.csv(dat,
           file = 'output/bernoulli/country_risk.csv',
           row.names = FALSE)
-
-# ~~~~~~~~~~~~~
-# now calculate PAR figures with uncertainty, for rural and urban/periurban
-
-# start a snowfall cluster on 60 CPUs
-sfInit(cpus = 60, parallel = TRUE)
-
-# export raster package and thresholding function to cluster
-sfLibrary(raster)
-sfExport('thresholdRisk')
-
-# get predictions as a list
-EBOV_PAR_list <- sfLapply(1:nlayers(EBOV_all),
-                           getPAR,
-                           '~/tmp/ebola_bern_all.tif',
-                           occ,
-                           pop_all)
-
-# convert to a dataframe
-df <- do.call(rbind, EBOV_PAR_list)

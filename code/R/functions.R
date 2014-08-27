@@ -252,34 +252,3 @@ thresholdRisk <- function (risk_raster,
   return (at_risk_raster)
   
 }
-
-getPAR <- function (i,
-          filename,
-          occ,
-          pop_all) {
-  
-  # calculate the populations at risk from each model of the ensemble
-  
-  # load the rasterbrick
-  brick <- brick(filename)
-  
-  # get the required layers
-  raster <- brick[[i]]
-  
-  # theshold it
-  risk <- thresholdRisk(brick[[i]],
-                        occ,
-                        proportion = 1)
-  
-  # multiply it by the population rasters
-  PAR <- risk * pop_all
-  
-  # calculate the total populations at risk
-  # in each stratum
-  ans <- c(all = cellStats(PAR[[1]], stat = 'sum'),
-           urban_periurban = cellStats(PAR[[2]], stat = 'sum'),
-           rural = cellStats(PAR[[3]]), stat = 'sum')
-  
-  # return this
-  return (ans)
-}
