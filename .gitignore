@@ -10,6 +10,7 @@ data/
 other/
 output/
 shared/
+ebola_zoonotic_figs/
 
 # ignore any non-code file types
 *.pdf
