@@ -11,7 +11,8 @@ other/
 output/
 shared/
 
-# ignore any pdfs or pngs
+# ignore any non-code file types
 *.pdf
 *.png
 *.html
+*.docx
